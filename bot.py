@@ -17,8 +17,8 @@ cur.execute("""
 db.commit()
 db.close()
 
-token = "8145970846:AAHRxwG2Pmu1MLA2tunymD0yI3v9IurcoAI"
-bot = telebot.TeleBot(token)
+token = "token"
+bot = telebot.TeleBot(token = token)
 
 
 @bot.message_handler(commands=['start'])

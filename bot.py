@@ -6,6 +6,8 @@ from functools import partial
 db = sqlite3.connect("base_data.db")
 cur = db.cursor()
 
+names = None
+
 cur.execute("""
     CREATE TABLE IF NOT EXISTS notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,6 +37,7 @@ def start(message):
 
 @bot.callback_query_handler(func=lambda call: call.data == "delete_note")
 def delete(call):
+    global names
     with sqlite3.connect("base_data.db") as db:
         cur = db.cursor()
         cur.execute("SELECT note_name FROM notes WHERE user_id = ?", (call.message.chat.id,))
@@ -93,18 +96,20 @@ def show_text(call):
 
     with sqlite3.connect("base_data.db") as db:
         cur = db.cursor()
-        cur.execute("SELECT note_text FROM notes WHERE user_id = ?", (call.message.chat.id,))
-        note_text = cur.fetchone()[0]
+        cur.execute("SELECT note_text FROM notes WHERE user_id = ? AND note_name = ?", (call.message.chat.id, note_name))
+        note_text = cur.fetchone()
 
-    if note_text and note_text[0]:
-        diformat_text = note_text.strip()
-        diformat_text.replace(" ", ",")
+    txt = ""
 
+    for el in note_text:
+        txt += el
+
+    if note_text:
         markup = types.InlineKeyboardMarkup()
-        btn = types.InlineKeyboardButton("запустить заново бота!!", callback_data = "restart")
+        btn = types.InlineKeyboardButton("Запустить заново бота!!", callback_data="restart")
         markup.add(btn)
         
-        bot.send_message(call.message.chat.id, f"Содержимое заметки '{note_name}':\n\n{diformat_text}", reply_markup=markup)
+        bot.send_message(call.message.chat.id, f"Содержимое заметки '{note_name}':\n\n{txt}", reply_markup=markup)
     else:
         bot.send_message(call.message.chat.id, f"В заметке '{note_name}' нет содержимого")
 
@@ -139,20 +144,27 @@ def text(message, note_name):
 
     with sqlite3.connect("base_data.db") as db:
         cur = db.cursor()
-        cur.execute("SELECT COUNT(*) FROM notes WHERE user_id = ? AND note_text = ?", (user_id, text_note))
-        if cur.fetchone()[0] > 0:
 
+        cur.execute("SELECT COUNT(*) FROM notes WHERE user_id = ? AND note_name = ? AND note_text = ?", 
+                    (user_id, note_name, text_note))
+        
+        result = cur.fetchone()
+
+        if result and result[0] > 0:
             bot.send_message(message.chat.id, "Заметка с таким текстом уже существует! Попробуйте другой текст.")
             return
         else:
-            cur.execute("UPDATE notes SET note_text = ? WHERE user_id = ? AND note_name = ?", (text_note, user_id, note_name))
-        db.commit()    
+            cur.execute("UPDATE notes SET note_text = ? WHERE user_id = ? AND note_name = ?", 
+                        (text_note, user_id, note_name))
+            db.commit()
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     btn1 = types.InlineKeyboardButton("Запустить бота снова!", callback_data="restart")
     markup.add(btn1)
 
     bot.send_message(message.chat.id, f"Текст для заметки '{note_name}' сохранен! Нажмите на кнопку и запустите бота снова!", reply_markup=markup)
+
+
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "restart")
